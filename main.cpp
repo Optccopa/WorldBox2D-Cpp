@@ -12,6 +12,7 @@
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_sdlrenderer3.h"
 
+// Material Enum
 enum Material{
     AIR,   // 0 - empty
     SAND,  // Falls and clumps
@@ -20,33 +21,36 @@ enum Material{
     DIRT   // Falls but not left / right
 };
 
+// Const settings
 const int width = 600; // Window width
 const int height = 400; // Window height
-const int popupX = 20;
-const int popupY = 20;
-const float shadeMin = 0.95f;
-const float shadeRange = 0.1f;
+const int popupX = 20; // X of popup for saves
+const int popupY = 20; // Y of popup for saves
+const int waterFlowSpeed = 8; // How much water can flow each tick, default 8
+const float shadeMin = 0.95f; // Lowest possible change in shade
+const float shadeRange = 0.1f; // How high above it can go from shadeMin
 
-// Settings:
+// Settings
 bool paused = false; // Pauses stepping
 int ticksPerSecond = 500; // Tick speed (Steps / second)
 Material material = SAND; // Material
 
-uint8_t grid[width * height] = {};
-uint8_t next[width * height] = {};
+uint8_t grid[width * height], next[width * height] = {}; // Init both arrays
 
-// Create shades grid
-float noise[width * height];
+float noise[width * height]; // Create shades grid
 
+// Find app data folder
 std::string appdata = std::getenv("LOCALAPPDATA");
 std::string folder = appdata + "\\2D-WorldBox";
 std::string gridSaveDir = folder + "\\grid.bin";
 
+// Popup timers
 static float saveErrorPopupTimer = 0.0f;
 static float saveSuccessPopupTimer = 0.0f;
 static float loadErrorPopupTimer = 0.0f;
 static float loadSuccessPopupTimer = 0.0f;
 
+// Steps grids
 void step(){
     memset(next, AIR, sizeof(next));
     for (int y = height - 1; y >= 0; y--){
@@ -122,7 +126,7 @@ void step(){
                                 int dirs[2] = { leftFirst ? -1 : 1, leftFirst ? 1 : -1 };
                                 for (int d : dirs) {
                                     int spread = 0;
-                                    for (int dist = 1; dist <= ticksPerSecond * 0.0166f; dist++) {
+                                    for (int dist = 1; dist <= waterFlowSpeed; dist++) {
                                         int nx = x + d * dist;
                                         if (nx < 0 || nx >= width) break;
                                         if (grid[y * width + nx] == AIR && next[y * width + nx] == AIR) {
@@ -148,9 +152,10 @@ void step(){
             }
         }
     }
-    memcpy(grid, next, sizeof(grid));
+    memcpy(grid, next, sizeof(grid)); // memcpy next to main grid
 }
 
+// Save helper
 int saveGrid(){
     std::ofstream out(gridSaveDir, std::ios::binary);
     if (!out) return 0;
@@ -158,6 +163,7 @@ int saveGrid(){
     return 1;
 }
 
+// Load helper
 int loadGrid(){
     std::ifstream in(gridSaveDir, std::ios::binary);
     if (!in) return 0;
@@ -166,28 +172,29 @@ int loadGrid(){
 }
 
 int main() {
-    CreateDirectoryA(folder.c_str(), NULL);
-    for (int i = 0; i < width * height; i++)
-        noise[i] = shadeMin + (rand() / (float)RAND_MAX) * shadeRange;
+    CreateDirectoryA(folder.c_str(), NULL); // Create save dir
+    for (int i = 0; i < width * height; i++){
+        noise[i] = shadeMin + (rand() / (float)RAND_MAX) * shadeRange; // Fill shade grid with random values once
+    }
 
     int loaded = loadGrid();
     if (!loaded){
-        std::cout << "Failed Loading saved grid\n"; 
+        std::cout << "Failed Loading saved grid\n";
     }
 
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO); // Init sdl video
     SDL_Window* window = SDL_CreateWindow("Sand and stuff", width, height, 0); // Create window
     SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr); // Create renderer
 
-    IMGUI_CHECKVERSION();
+    IMGUI_CHECKVERSION(); 
     ImGui::CreateContext();
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
 
-    SDL_Event e;
+    SDL_Event e; // Define event sdl var
 
-    Uint64 lastTime = SDL_GetTicks();
-    float accumulator = 0.0f;
+    Uint64 lastTime = SDL_GetTicks(); // Last tick
+    float accumulator = 0.0f; // Tick accumulater
 
     bool running = true;
     while (running) {
